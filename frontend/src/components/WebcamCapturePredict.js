@@ -4,35 +4,28 @@ import axios from 'axios';
 
 const WebcamCapturePredict = () => {
   const webcamRef = useRef(null);
-  const [detectionResult, setDetectionResult] = useState(''); // State to store the detection result
-  const [capturedImage, setCapturedImage] = useState(''); // State to store the captured image
+  const [detectionResult, setDetectionResult] = useState('');
+  const [capturedImage, setCapturedImage] = useState('');
 
-  // Function to capture the image and send it to the backend
   const captureAndSend = async () => {
     if (webcamRef.current) {
-      // Capture the screenshot from the webcam
       const imageSrc = webcamRef.current.getScreenshot();
-      setCapturedImage(imageSrc); // Set the captured image to display it
+      setCapturedImage(imageSrc);
 
       if (imageSrc) {
         try {
-          // Convert the base64 image to a Blob
           const response = await fetch(imageSrc);
           const blob = await response.blob();
           const formData = new FormData();
-          formData.append('file', blob, 'image.jpg'); // Append the blob to formData
+          formData.append('file', blob, 'image.jpg');
 
-          // Send the image using axios
           let apiResponse = await axios.post('http://127.0.0.1:8000/upload-image-predict', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-            },
+            headers: { 'Content-Type': 'multipart/form-data' },
           });
 
           console.log("Image sent");
           console.log(apiResponse);
 
-          // Extract and update the detection result
           if (apiResponse.data && apiResponse.data.detection) {
             setDetectionResult(apiResponse.data.detection);
           } else {
@@ -47,30 +40,37 @@ const WebcamCapturePredict = () => {
   };
 
   return (
-    <div>
-      <h2>Webcam Capture</h2>
-      <Webcam
-        audio={false}
-        ref={webcamRef}
-        screenshotFormat="image/jpeg"
-        width={400}
-        height={300}
-      />
-      <button onClick={captureAndSend}>Capture and Send</button>
+    <div className="container mt-4">
+      <h2 className="text-center mb-4">Webcam Capture</h2>
+      
+      <div className="d-flex justify-content-center mb-3">
+        <Webcam
+          audio={false}
+          ref={webcamRef}
+          screenshotFormat="image/jpeg"
+          width={400}
+          height={300}
+          className="border rounded shadow-sm"
+        />
+      </div>
 
-      {/* Display the captured image */}
+      <div className="text-center mb-4">
+        <button className="btn btn-primary" onClick={captureAndSend}>
+          Capture and Send
+        </button>
+      </div>
+
       {capturedImage && (
-        <div>
+        <div className="text-center mb-4">
           <h3>Captured Image:</h3>
-          <img src={capturedImage} alt="Captured" style={{ width: '400px', height: '300px', margin: '10px 0' }} />
+          <img src={capturedImage} alt="Captured" className="img-fluid border rounded shadow-sm" style={{ maxWidth: '100%', width: '400px', height: '300px', marginTop: '10px' }} />
         </div>
       )}
 
-      {/* Display the detection result */}
       {detectionResult && (
-        <div>
+        <div className="text-center">
           <h3>Detection Result:</h3>
-          <p>{detectionResult}</p>
+          <p className="alert alert-info">{detectionResult}</p>
         </div>
       )}
     </div>

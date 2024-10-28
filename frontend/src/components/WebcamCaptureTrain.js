@@ -3,9 +3,9 @@ import React, { useState, useEffect, useRef } from "react";
 const WebcamCaptureTrain = () => {
   const videoRef = useRef(null);
   const [capturedImages, setCapturedImages] = useState([]);
-  const [isCapturing, setIsCapturing] = useState(false); // To control capture state
+  const [label, setLabel] = useState(""); // New state to store label
+  const [isCapturing, setIsCapturing] = useState(false);
 
-  // Function to capture the image from the video stream
   const captureFrame = () => {
     const videoElement = videoRef.current;
     const canvas = document.createElement("canvas");
@@ -13,18 +13,17 @@ const WebcamCaptureTrain = () => {
     canvas.height = videoElement.videoHeight;
     const ctx = canvas.getContext("2d");
     ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg"); // Convert to base64 image
+    return canvas.toDataURL("image/jpeg");
   };
 
-  // Send all captured images to FastAPI backend after 60 frames
-  const sendAllImages = async (images) => {
+  const sendAllImages = async (images, label) => {
     try {
       await fetch("http://localhost:8000/upload-image-train", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ images }),
+        body: JSON.stringify({ images, label }), // Include label
       });
       console.log("All images sent!");
     } catch (error) {
@@ -32,13 +31,11 @@ const WebcamCaptureTrain = () => {
     }
   };
 
-  // Function to start capturing images
   const startCapture = () => {
-    setCapturedImages([]); // Reset the captured images
-    setIsCapturing(true); // Set capture state to true
+    setCapturedImages([]);
+    setIsCapturing(true);
   };
 
-  // Capture image every 1 second (60 times) when isCapturing is true
   useEffect(() => {
     let intervalId;
     if (isCapturing) {
@@ -48,16 +45,15 @@ const WebcamCaptureTrain = () => {
           setCapturedImages((prevImages) => [...prevImages, newImage]);
         } else {
           clearInterval(intervalId);
-          sendAllImages(capturedImages); // Send all images to backend once captured
-          setIsCapturing(false); // Stop capturing after sending images
+          sendAllImages(capturedImages, label); // Send label with images
+          setIsCapturing(false);
         }
-      }, 200); // 1 second interval
+      }, 100);
     }
 
     return () => clearInterval(intervalId);
-  }, [isCapturing, capturedImages]);
+  }, [isCapturing, capturedImages, label]);
 
-  // Start video stream
   useEffect(() => {
     navigator.mediaDevices
       .getUserMedia({ video: true })
@@ -68,21 +64,35 @@ const WebcamCaptureTrain = () => {
   }, []);
 
   return (
-    <div>
-      <h1>Capturing Images...</h1>
-      {/* Show video stream */}
-      <video
-        ref={videoRef}
-        autoPlay
-        style={{ width: "400px", height: "300px" }}
-      ></video>
-
-      {/* Button to start capture */}
-      <button onClick={startCapture} disabled={isCapturing}>
-        Start Capture
-      </button>
-
-      {isCapturing && <p>Capturing images...</p>}
+    <div className="container mt-4">
+      <h1 className="text-center mb-4">Capturing Images...</h1>
+      <div className="mb-3">
+        <input
+          type="text"
+          className="form-control"
+          placeholder="Enter label"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+        />
+      </div>
+      <div className="d-flex justify-content-center mb-3">
+        <video
+          ref={videoRef}
+          autoPlay
+          style={{ width: "400px", height: "300px" }}
+          className="border rounded shadow-sm"
+        ></video>
+      </div>
+      <div className="text-center">
+        <button
+          className="btn btn-primary"
+          onClick={startCapture}
+          disabled={!label || isCapturing}
+        >
+          Start Capture
+        </button>
+      </div>
+      {isCapturing && <p className="text-center mt-3">Capturing images...</p>}
     </div>
   );
 };
