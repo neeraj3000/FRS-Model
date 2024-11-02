@@ -1,0 +1,72 @@
+/* WebcamCapture.css */
+
+/* General page styling */
+.webcam-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: #f4f7f9;
+    font-family: 'Arial', sans-serif;
+  }
+  
+  /* Title styling */
+  .title {
+    font-size: 32px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  
+  /* Video container styling */
+  .video-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+    border: 5px solid #007bff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Styling for the video stream */
+  .video-stream {
+    width: 400px;
+    height: 300px;
+    border-radius: 5px;
+    background-color: #000;
+  }
+  
+  /* Capture button styling */
+  .capture-button {
+    padding: 12px 24px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  .capture-button:hover {
+    background-color: #0056b3;
+    box-shadow: 0 4px 10px rgba(0, 123, 255, 0.5);
+  }
+  
+  .capture-button.disabled {
+    background-color: #888;
+    cursor: not-allowed;
+  }
+  
+  /* Status message styling */
+  .status-message {
+    margin-top: 20px;
+    font-size: 18px;
+    font-weight: 500;
+    color: #ff0000;
+    text-align: center;
+  }
+  
