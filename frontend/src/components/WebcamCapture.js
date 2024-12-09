@@ -41,7 +41,7 @@ const BlurOverlay = styled(Box)({
 const MessageBox = styled(Box)({
   display: 'flex',
   alignItems: 'center',
-  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  backgroundColor: 'rgba(255, 255, 255, 0.8)', // Semi-transparent background
   padding: '20px',
   borderRadius: '8px',
   textAlign: 'center',
@@ -55,7 +55,7 @@ const MessageBox = styled(Box)({
 const AnimatedHourglass = styled(HourglassEmptyIcon)({
   marginLeft: '10px',
   fontSize: '25px',
-  animation: 'spin 2s infinite linear',
+  animation: 'spin 2s infinite linear', // Rotates the icon
   '@keyframes spin': {
     '0%': { transform: 'rotate(0deg)' },
     '100%': { transform: 'rotate(360deg)' },
@@ -66,12 +66,15 @@ const WebcamCapture = () => {
   const videoRef = useRef(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
-  const [capturedImages, setCapturedImages] = useState([]); // To store all 5 images
+  const [curFrame, setCurFrame] = useState(0);
+  const [successfulFrames, setSuccessfulFrames] = useState(0);
+  const [totalFrames, setTotalFrames] = useState(0);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const formData = location.state;
-
+  
   const captureFrame = () => {
     const videoElement = videoRef.current;
     const canvas = document.createElement("canvas");
@@ -82,32 +85,42 @@ const WebcamCapture = () => {
     return canvas.toDataURL("image/jpeg");
   };
 
-  // Send all 5 images to the backend
-  const sendAllImages = async (images) => {
+  const sendImage = async (image) => {
     try {
-      const response = await fetch("http://localhost:8000/verify-multiple-frames", {
+      const response = await fetch("http://localhost:8000/verify-frame", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images, formData }),
+        body: JSON.stringify({ image, formData }),
       });
       
       const data = await response.json();
-
-      if (data.status === "success") {
-        setStatusMessage("Images processed successfully.");
-        setIsRedirecting(true);
-        setTimeout(() => navigate("/student"), 3000);
-      } else {
-        setStatusMessage("Error processing images.");
+      
+      if (data.status) {
+        setCurFrame((prev) => prev + 1);
+        
+        if (data.status === "low_confidence") {
+          setStatusMessage(data.message);
+        } else if (data.status === "stop") {
+          setStatusMessage("Maximum embeddings reached. Stopping capture.");
+          setIsCapturing(false);
+          setIsRedirecting(true);
+          
+          setTimeout(() => {
+            navigate("/student");
+          }, 3000);
+        } else {
+          setSuccessfulFrames((prev) => prev + 1);
+          setTotalFrames(data.total);
+          setStatusMessage(`Face detected successfully.`);
+        }
       }
     } catch (error) {
-      console.error("Error sending images to the backend", error);
+      console.error("Error sending image to the backend", error);
       setStatusMessage("Error connecting to backend.");
     }
   };
 
   const startCapture = () => {
-    setCapturedImages([]); // Clear previous images
     setStatusMessage("");
     setIsCapturing(true);
   };
@@ -117,15 +130,7 @@ const WebcamCapture = () => {
     if (isCapturing) {
       intervalId = setInterval(() => {
         const newImage = captureFrame();
-        setCapturedImages((prevImages) => {
-          const updatedImages = [...prevImages, newImage];
-          if (updatedImages.length === 5) { // Stop capturing after 5 images
-            clearInterval(intervalId);
-            setIsCapturing(false);
-            sendAllImages(updatedImages); // Send all 5 images at once
-          }
-          return updatedImages;
-        });
+        sendImage(newImage);
       }, 1000);
     }
     return () => clearInterval(intervalId);
@@ -139,6 +144,16 @@ const WebcamCapture = () => {
       })
       .catch((err) => console.error("Error accessing webcam", err));
   }, []);
+
+  const getStatusMessageColor = (message) => {
+    const messageStr = String(message);
+    if (messageStr.includes("Face detected") || messageStr.includes("Reached maximum embedding count")) {
+      return 'green';
+    } else if (messageStr.includes("Low confidence")) {
+      return 'red';
+    }
+    return 'black';
+  };
 
   return (
     <>
@@ -167,6 +182,29 @@ const WebcamCapture = () => {
             </Paper>
           </Grid>
 
+          <Grid item xs={12} md={3}>
+            <InfoCard>
+              <CardContent>
+                <Typography variant="h6" color="textSecondary">
+                  Current Frame Sent
+                </Typography>
+                <Typography variant="h5" color="primary">
+                  {curFrame}
+                </Typography>
+              </CardContent>
+            </InfoCard>
+            <InfoCard>
+              <CardContent>
+                <Typography variant="h6" color="textSecondary">
+                  Detected Frames
+                </Typography>
+                <Typography variant="h5" style={{ color: '#28a745' }}>
+                  {successfulFrames} / {totalFrames}
+                </Typography>
+              </CardContent>
+            </InfoCard>
+          </Grid>
+
           <Grid item xs={12} style={{ textAlign: 'center', marginTop: '20px' }}>
             <Button 
               variant="contained" 
@@ -184,7 +222,7 @@ const WebcamCapture = () => {
               <Typography
                 variant="body1"
                 align="center"
-                style={{ marginTop: '20px', color: 'black' }}
+                style={{ marginTop: '20px', color: getStatusMessageColor(statusMessage) }}
               >
                 {statusMessage}
               </Typography>

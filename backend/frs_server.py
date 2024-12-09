@@ -1,7 +1,7 @@
 from fastapi import FastAPI, File, UploadFile , HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Optional
-from pydantic import BaseModel,constr
+from pydantic import BaseModel
 import base64
 import numpy as np
 import cv2
@@ -18,7 +18,7 @@ import json
 from predict import enhance_and_reduce_noise,detect_face
 from train import train_images
 
-client = MongoClient("mongodb+srv://neeraj3000:wGwt4evpDZq2LKk6@cluster0.7wryp.mongodb.net")
+client = MongoClient("mongodb+srv://neeraj3000:wGwt4evpDZq2LKk6@cluster0.7wryp.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 db = client['student']
 collection = db['student_details']
 r20_collection = db['r20']
@@ -30,7 +30,7 @@ class ImageData(BaseModel):
     image: str
 
 class Student(BaseModel):
-    images: List[constr(strip_whitespace=True, min_length=1)]
+    image: str
     formData: dict
 
 class StudentData(BaseModel):
@@ -57,13 +57,13 @@ def crop_faces(img):
         results = cropper.predict(img)
         result = results[0]
         if len(result.boxes) == 0:
-            return {"status":"No face",'message':"No face is detected in some frames"}  
-        if len(result.boxes) > 1:
-            return {"status":"multiple faces",'message':"Multiple faces are detected in some frames"}
+            print("No face detected")
+            return None  
         box = result.boxes
         confidence = box.conf[0]
         if confidence < 0.85:  
-            return {"status":"Face is not clear",'message':"Face is not clear in some frames"}
+            print("Low confidence detection")
+            return None
         x1, y1, x2, y2 = box.xyxy[0]
         x1, y1, x2, y2 = round(x1.item()), round(y1.item()), round(x2.item()), round(y2.item())
         h, w, ch = img.shape
@@ -143,7 +143,7 @@ async def upload_image(file: UploadFile = File(...)):
 async def upload_images(data: ImageBatch):
     try:
         image_list = []
-        # print(len(data.images))
+
         for i, image in enumerate(data.images):
             image_data = base64.b64decode(image.split(",")[1])
             np_arr = np.frombuffer(image_data, np.uint8)
@@ -161,32 +161,43 @@ embeddings_list = []
 count = 0
 total_embeddings = 60
 
-@app.post("/verify-multiple-frames")
+@app.post("/verify-frame")
 async def verify(data: Student):
     global embeddings_list
     global count
     global total_embeddings
     if len(embeddings_list) >= total_embeddings:
         return {"status": "stop", "message": "Maximum embedding count reached, stopping further frames"}
-    for image in data.images:
-        image_data = base64.b64decode(image.split(",")[1])
-        np_arr = np.frombuffer(image_data, np.uint8)
-        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        face = crop_faces(img)
-        if isinstance(face,dict):
-            return face
+    image_data = base64.b64decode(data.image.split(",")[1])
+    np_arr = np.frombuffer(image_data, np.uint8)
+    img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    face = crop_faces(img)
+    if face is not None:
+        embedding = get_embeddings(face, embedder)
+        embeddings_list.append(embedding)
+        count = count + 1
+        print(f"embedding {count} taken")
+        if(len(embeddings_list) >= total_embeddings):
+            embeddings = [embed.tolist() for embed in embeddings_list]
+            document = {
+                "name" : data.formData['formData']['name'],
+                "id" : data.formData['formData']['studentId'],
+                "batch" : data.formData['formData']['batch'],
+                "branch" : data.formData['formData']['branch'],
+                "section" : data.formData['formData']['section'],
+                "embeddings" : embeddings
+            }
+            collection.insert_one(document)
+            print("Data uploaded to mongodb")
+
+            embeddings_list.clear()
+            count = 0
+            return {"status": "stop", "message": "Reached maximum embedding count"}
         else:
-            embedding = get_embeddings(face, embedder)
-            embeddings_list.append(embedding)
-            count = count + 1
-            print("embeddings taken")
-    embeddings = [embed.tolist() for embed in embeddings_list]
-   
-    r20_collection.update_one({"id" : data.formData['formData']['studentId']},
-        {"$set": {"embeddings" : embeddings}})
-    print("Data uploaded to mongodb")
-    embeddings_list.clear()  
+            return {"status": "success", "message": "Face detected", "total": total_embeddings}
+    else:
+        return {"status": "low_confidence", "message": "Low confidence, ensure that you are in good lighting"}
     
 # @app.post("/student-details")
 # async def student_details(details: studentDetails):

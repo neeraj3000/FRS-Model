@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 const WebcamCaptureTrain = () => {
   const videoRef = useRef(null);
   const [capturedImages, setCapturedImages] = useState([]);
-  const [isCapturing, setIsCapturing] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false); // To control capture state
 
   // Function to capture the image from the video stream
   const captureFrame = () => {
@@ -16,7 +16,7 @@ const WebcamCaptureTrain = () => {
     return canvas.toDataURL("image/jpeg"); // Convert to base64 image
   };
 
-  // Function to send all images to backend after capturing 5 frames
+  // Send all captured images to FastAPI backend after 60 frames
   const sendAllImages = async (images) => {
     try {
       await fetch("http://localhost:8000/upload-image-train", {
@@ -35,31 +35,27 @@ const WebcamCaptureTrain = () => {
   // Function to start capturing images
   const startCapture = () => {
     setCapturedImages([]); // Reset the captured images
-    setIsCapturing(true); // Start capturing process
+    setIsCapturing(true); // Set capture state to true
   };
 
-  // Capture images every 200ms when isCapturing is true
+  // Capture image every 1 second (60 times) when isCapturing is true
   useEffect(() => {
-    let captureCount = 0;
     let intervalId;
-
     if (isCapturing) {
       intervalId = setInterval(() => {
-        if (captureCount < 5) {
+        if (capturedImages.length < 60) {
           const newImage = captureFrame();
           setCapturedImages((prevImages) => [...prevImages, newImage]);
-          captureCount += 1;
         } else {
           clearInterval(intervalId);
-          sendAllImages(capturedImages).then(() => {
-            setIsCapturing(false); // Stop capturing after sending images
-          });
+          sendAllImages(capturedImages); // Send all images to backend once captured
+          setIsCapturing(false); // Stop capturing after sending images
         }
-      }, 200); // Capture every 200ms
+      }, 200); // 1 second interval
     }
 
     return () => clearInterval(intervalId);
-  }, [isCapturing]);
+  }, [isCapturing, capturedImages]);
 
   // Start video stream
   useEffect(() => {
@@ -73,7 +69,7 @@ const WebcamCaptureTrain = () => {
 
   return (
     <div>
-      <h1>Webcam Image Capture</h1>
+      <h1>Capturing Images...</h1>
       {/* Show video stream */}
       <video
         ref={videoRef}
