@@ -19,6 +19,7 @@ from predict import enhance_and_reduce_noise,detect_face
 from train import train_images
 
 client = MongoClient("mongodb+srv://neeraj3000:wGwt4evpDZq2LKk6@cluster0.7wryp.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+client = MongoClient("mongodb+srv://neeraj3000:wGwt4evpDZq2LKk6@cluster0.7wryp.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 db = client['student']
 collection = db['student_details']
 r20_collection = db['r20']
@@ -41,6 +42,7 @@ class ImageData(BaseModel):
     image: str
 
 class Student(BaseModel):
+    image: str
     image: str
     formData: dict
 
@@ -153,6 +155,7 @@ async def upload_image(file: UploadFile = File(...)):
 async def upload_images(data: ImageBatch):
     try:
         image_list = []
+
 
         for i, image in enumerate(data.images):
             image_data = base64.b64decode(image.split(",")[1])
