@@ -1,7 +1,7 @@
 from fastapi import FastAPI, File, UploadFile , HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import base64
 import numpy as np
 import cv2
@@ -19,17 +19,30 @@ from predict import enhance_and_reduce_noise,detect_face
 from train import train_images
 
 client = MongoClient("mongodb+srv://neeraj3000:wGwt4evpDZq2LKk6@cluster0.7wryp.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+client = MongoClient("mongodb+srv://neeraj3000:wGwt4evpDZq2LKk6@cluster0.7wryp.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 db = client['student']
 collection = db['student_details']
 r20_collection = db['r20']
 
 class ImageBatch(BaseModel):
     images: list[str]
+    
+class StudentDetails(BaseModel):
+    batch: str
+    branch: str
+    name: str
+    section: str
+    studentId: str 
+class CapturedImages(BaseModel):
+    form_data: StudentDetails 
+    images: List[str]  # List of base64 encoded image strings
+
 
 class ImageData(BaseModel):
     image: str
 
 class Student(BaseModel):
+    image: str
     image: str
     formData: dict
 
@@ -50,7 +63,6 @@ app = FastAPI()
 cropper = YOLO('locals/neeraj_yolo.pt')
 embedder = FaceNet()
 
-# Function to crop faces
 @ExceptionHandler
 def crop_faces(img):
     def return_crop_face(img, cropper):
@@ -58,12 +70,12 @@ def crop_faces(img):
         result = results[0]
         if len(result.boxes) == 0:
             print("No face detected")
-            return None  
+            return {'message':'No face detected' , 'status':0}  
         box = result.boxes
         confidence = box.conf[0]
         if confidence < 0.85:  
             print("Low confidence detection")
-            return None
+            return {'message':'No face detected' , 'status':1}
         x1, y1, x2, y2 = box.xyxy[0]
         x1, y1, x2, y2 = round(x1.item()), round(y1.item()), round(x2.item()), round(y2.item())
         h, w, ch = img.shape
@@ -144,6 +156,7 @@ async def upload_images(data: ImageBatch):
     try:
         image_list = []
 
+
         for i, image in enumerate(data.images):
             image_data = base64.b64decode(image.split(",")[1])
             np_arr = np.frombuffer(image_data, np.uint8)
@@ -159,51 +172,56 @@ async def upload_images(data: ImageBatch):
 
 embeddings_list = []
 count = 0
-total_embeddings = 60
 
-@app.post("/verify-frame")
-async def verify(data: Student):
+@app.post("/verify-batch")
+async def verify_batch(data: CapturedImages):
     global embeddings_list
     global count
-    global total_embeddings
-    if len(embeddings_list) >= total_embeddings:
-        return {"status": "stop", "message": "Maximum embedding count reached, stopping further frames"}
-    image_data = base64.b64decode(data.image.split(",")[1])
-    np_arr = np.frombuffer(image_data, np.uint8)
-    img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    face = crop_faces(img)
-    if face is not None:
-        embedding = get_embeddings(face, embedder)
-        embeddings_list.append(embedding)
-        count = count + 1
-        print(f"embedding {count} taken")
-        if(len(embeddings_list) >= total_embeddings):
-            embeddings = [embed.tolist() for embed in embeddings_list]
-            document = {
-                "name" : data.formData['formData']['name'],
-                "id" : data.formData['formData']['studentId'],
-                "batch" : data.formData['formData']['batch'],
-                "branch" : data.formData['formData']['branch'],
-                "section" : data.formData['formData']['section'],
-                "embeddings" : embeddings
-            }
-            collection.insert_one(document)
-            print("Data uploaded to mongodb")
+    low_confidence_count = 0
+    no_face_count = 0
 
-            embeddings_list.clear()
-            count = 0
-            return {"status": "stop", "message": "Reached maximum embedding count"}
+    images_length = len(data.images)
+    for image in data.images:
+        image_data = base64.b64decode(image.split(",")[1])
+        np_arr = np.frombuffer(image_data, np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        face = crop_faces(img)
+        if isinstance(face,dict):
+            if face.status == 0:
+                no_face_count = no_face_count + 1
+            else:
+                low_confidence_count = low_confidence_count + 1
         else:
-            return {"status": "success", "message": "Face detected", "total": total_embeddings}
+            embedding = get_embeddings(face, embedder)
+            embeddings_list.append(embedding)
+            count = count + 1
+            print(f"embedding {count} taken")
+    embeddings = [embed.tolist() for embed in embeddings_list]
+    document = {
+        "name" : data.form_data['formData']['name'],
+        "id" : data.form_data['formData']['studentId'],
+        "batch" : data.form_data['formData']['batch'],
+        "branch" : data.form_data['formData']['branch'],
+        "section" : data.form_data['formData']['section'],
+        "embeddings" : embeddings
+    }
+    filter_query = {"id": data.form_data['formData']['studentId']}
+    result = collection.replace_one(filter_query,document,upsert=True)
+    embeddings_list.clear()
+    if result.matched_count:
+        print("Data uploaded to mongodb")
+        if(count == images_length):
+            count=0
+            return {'status':200,'message':'your face embeddings are taken sucessfully taken'}
+        else:
+            count=0
+            return {'status':207 ,'message':f'{count} only sucessfully taken. Resend {images_length - count} images'}
     else:
-        return {"status": "low_confidence", "message": "Low confidence, ensure that you are in good lighting"}
-    
-# @app.post("/student-details")
-# async def student_details(details: studentDetails):
-#     stu_id = details.studentId
-#     result = r20_collection.find({'studentId':stu_id})
-#     return result
+        count=0
+        return {'status':400 , 'message':'Error in inserting the data into the database'}
+
+
 
 @app.post('/student-details')
 async def student_details(details: studentDetails):
@@ -274,6 +292,4 @@ async def delete_student(student_id: str):
         raise HTTPException(status_code=404, detail="Student not found")
     return {"message": "Student deleted successfully"}
 
-    
 
-    
