@@ -1,2 +1,5 @@
 frontend/node_modules/
+backend/__pycache__/
+backend/myenv/
+backend/json_for_testing.txt
 .codegpt
