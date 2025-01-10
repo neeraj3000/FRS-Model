@@ -131,7 +131,7 @@ const WebcamCapture = () => {
       intervalId = setInterval(() => {
         const newImage = captureFrame();
         sendImage(newImage);
-      }, 1000);
+      }, 500);
     }
     return () => clearInterval(intervalId);
   }, [isCapturing]);

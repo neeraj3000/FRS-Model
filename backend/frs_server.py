@@ -52,35 +52,27 @@ embedder = FaceNet()
 
 # Function to crop faces
 @ExceptionHandler
-def crop_faces(img):
-    def return_crop_face(img, cropper):
-        results = cropper.predict(img)
-        result = results[0]
-        if len(result.boxes) == 0:
-            print("No face detected")
-            return None  
-        box = result.boxes
-        confidence = box.conf[0]
-        if confidence < 0.85:  
-            print("Low confidence detection")
-            return None
-        x1, y1, x2, y2 = box.xyxy[0]
-        x1, y1, x2, y2 = round(x1.item()), round(y1.item()), round(x2.item()), round(y2.item())
-        h, w, ch = img.shape
-        x1, y1 = max(0, x1), max(0, y1)
-        x2, y2 = min(w, x2), min(h, y2)
-        face = img[y1:y2, x1:x2]
-        return face
-    # faces = []
-    # for img in images:
-    face = return_crop_face(img, cropper)
-    if face is not None:  # Only append valid faces
+def crop_faces(img,cropper):
+    results = cropper.predict(img)
+    result = results[0]
+    if len(result.boxes) == 0:
+        print("No face detected")
+        return None  
+    box = result.boxes
+    confidence = box.conf[0]
+    if confidence < 0.85:  
+        print("Low confidence detection")
+        return None
+    x1, y1, x2, y2 = box.xyxy[0]
+    x1, y1, x2, y2 = round(x1.item()), round(y1.item()), round(x2.item()), round(y2.item())
+    h, w, ch = img.shape
+    x1, y1 = max(0, x1), max(0, y1)
+    x2, y2 = min(w, x2), min(h, y2)
+    face = img[y1:y2, x1:x2]
+    if face is not None:  
         face = cv2.cvtColor(face, cv2.COLOR_RGB2BGR)
-        # faces.append(face)
     else:
-        # print("No valid face detected in this image")
         pass
-
     return face
 
 @ExceptionHandler
@@ -172,7 +164,7 @@ async def verify(data: Student):
     np_arr = np.frombuffer(image_data, np.uint8)
     img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    face = crop_faces(img)
+    face = crop_faces(img, cropper)
     if face is not None:
         embedding = get_embeddings(face, embedder)
         embeddings_list.append(embedding)
