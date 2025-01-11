@@ -5,13 +5,35 @@ from tensorflow.keras.models import load_model
 from keras_facenet import FaceNet
 import cv2
 from exception_handler import ExceptionHandler
+import os
+
+file_path = 'locals/enocoder_classes_v3.npy'
+file_path2 = 'locals/svc_model_v3.pkl'
+embedder = FaceNet()
+cropper = YOLO('locals/neeraj_yolo.pt')
+
 
 
 CONF_THRESHOLD = 0.70
-encoder_classes = np.load('locals/enocoder_classes_v3.npy',allow_pickle=True)
-cropper = YOLO('locals/neeraj_yolo.pt')
-model = pickle.load(open('locals/svc_model_v3.pkl','rb'))
-embedder = FaceNet()
+if os.path.exists(file_path):
+    try:
+        encoder_classes = np.load(file_path, allow_pickle=True)
+        print("Encoder classes loaded successfully.")
+    except Exception as e:
+        print(f"Error loading encoder classes: {e}")
+else:
+    print(f"File not found: {file_path}")
+    encoder_classes = None  # Set to None or a default valuecropper = YOLO('locals/neeraj_yolo.pt')
+if os.path.exists(file_path2):
+    try:
+        with open(file_path2, 'rb') as file:
+            model = pickle.load(file)
+            print("Model loaded successfully.")
+    except Exception as e:
+        print(f"Error loading the model: {e}")
+else:
+    print(f"File not found: {file_path2}")
+    model = None  # Set to None or handle appropriatelyembedder = FaceNet()
 
 @ExceptionHandler
 def enhance_and_reduce_noise(image, save_path='enhanced_minimal_soften_image.jpg'):

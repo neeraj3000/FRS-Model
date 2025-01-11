@@ -4,13 +4,26 @@ from keras_facenet import FaceNet
 import pickle
 from exception_handler import ExceptionHandler
 from sklearn.preprocessing import LabelEncoder
+import os
 
 embedder = FaceNet()
 model = pickle.load(open('locals/svc_model_v3.pkl','rb'))
 
 @ExceptionHandler
 def save_encoder_classes(encoder_classes):
-    np.save('locals/enocoder_classes_v3.npy',encoder_classes)
+    # Ensure the `locals` directory exists
+    directory = 'locals'
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    
+    # Save the encoder classes to the file
+    file_path = os.path.join(directory, 'enocoder_classes_v3.npy')
+    try:
+        np.save(file_path, encoder_classes)
+        print(f"Encoder classes saved successfully at {file_path}")
+    except Exception as e:
+        print(f"Failed to save encoder classes: {e}")
+
 
 @ExceptionHandler
 def save_model(model):
