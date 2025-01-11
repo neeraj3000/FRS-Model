@@ -136,19 +136,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/upload-image-predict")
-async def upload_image(file: UploadFile = File(...)):
-    try:
-        # Save the uploaded file locally or process it as needed
-        contents = await file.read()
-        with open(f"uploaded_{file.filename}", "wb") as f:
-            f.write(contents)
-        img = cv2.imread('uploaded_image.jpg')
-        img = enhance_and_reduce_noise(img)
-        detection = detect_face(img)
-        return {"detection": detection[0]}
-    except Exception as e:
-        return {"error": str(e)}
+# @app.post("/upload-image-predict")
+# async def upload_image(file: UploadFile = File(...)):
+#     try:
+#         # Save the uploaded file locally or process it as needed
+#         contents = await file.read()
+#         with open(f"uploaded_{file.filename}", "wb") as f:
+#             f.write(contents)
+#         img = cv2.imread('uploaded_image.jpg')
+#         img = enhance_and_reduce_noise(img)
+#         detection = detect_face(img)
+#         return {"detection": detection[0]}
+#     except Exception as e:
+#         return {"error": str(e)}
 
 
 @app.post("/upload-image-train")
